@@ -33,18 +33,78 @@ When you're ready, run:
 npm run reset-project
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+// Follow this setup guide to integrate the Deno language server with your editor:
+// https://deno.land/manual/getting_started/setup_your_environment
+// This enables autocomplete, go to definition, etc.
+// Setup type definitions for built-in Supabase Runtime APIs
+// import { createClient } from "@supabase/supabase-js";
+// Setup type definitions for built-in Supabase Runtime APIs
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+console.log("Hello from Eldics!");
+Deno.serve(async (req)=>{
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      status: 200
+    });
+  }
+  try {
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_ANON_KEY"), {
+      global: {
+        headers: {
+          Authorization: req.headers.get("Authorization")
+        }
+      }
+    });
+    const payload = await req.json();
+    console.log("Payload from edge func", payload);
+    const { data } = await supabaseClient.from("awesome_users").select("expo_push_token").eq("expo_push_token", payload.record.expo_push_token).single();
+    const notificationBody = "Nice to have you with Eldics. Please subscribe to Eldics Channel YouTube";
+    const res = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("EXPO_ACCESS_TOKEN1")}`
+      },
+      body: JSON.stringify({
+        to: data?.expo_push_token,
+        sound: "default",
+        body: notificationBody
+      })
+    }).then((res)=>res.json());
+    console.log("res status-->", res);
+    if (res.data.status === 'ok') {
+      console.log("res was okay");
+    } else {
+      console.error("Failed to send notification:", res);
+    }
+    return new Response(JSON.stringify(res), {
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+  } catch (error) {
+    console.error("Error in pushNotification function:", error);
+    return new Response(JSON.stringify({
+      error: "Failed to send notification"
+    }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+  }
+}); /* To invoke locally:
 
-## Learn more
+  1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
+  2. Make an HTTP request:
 
-To learn more about developing your project with Expo, look at the following resources:
+  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/pushNotification' \
+    --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' \
+    --header 'Content-Type: application/json' \
+    --data '{"name":"Functions"}'
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+*/ 
 
-## Join the community
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+//***End SQL CODE 
